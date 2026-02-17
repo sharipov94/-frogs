@@ -10,14 +10,6 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
     def is_admin(uid: int):
         return uid in admin_ids
 
-    @r.callback_query(F.data == "admin:add_help")
-    async def admin_add_help(cq: CallbackQuery):
-        if not is_admin(cq.from_user.id):
-            await cq.answer("Нет доступа", show_alert=True)
-            return
-        await cq.message.edit_text("Добавление товара: используй команду /add_product", reply_markup=kb_admin_panel())
-        await cq.answer()
-
     @r.callback_query(F.data == "admin:products")
     async def admin_products(cq: CallbackQuery):
         if not is_admin(cq.from_user.id):
@@ -40,15 +32,6 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
         buttons.append([InlineKeyboardButton(text="← Назад", callback_data="menu:admin")])
         await cq.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
         await cq.answer()
-
-    @r.callback_query(F.data.startswith("admin_edit_hint:"))
-    async def admin_edit_hint(cq: CallbackQuery):
-        if not is_admin(cq.from_user.id):
-            await cq.answer("Нет доступа", show_alert=True)
-            return
-        pid = int(cq.data.split(":")[1])
-        await cq.answer()
-        await cq.message.answer(f"Редактирование товара: /edit_product {pid}")
 
     @r.callback_query(F.data.startswith("admin_status:"))
     async def change_status(cq: CallbackQuery):

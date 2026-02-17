@@ -108,6 +108,16 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
         await state.set_state(AddProduct.title)
         await m.answer("Название товара?")
 
+    @r.callback_query(F.data == "admin:add")
+    async def add_product_start_cb(cq: CallbackQuery, state: FSMContext):
+        if not is_admin(cq.from_user.id):
+            await cq.answer("Нет доступа", show_alert=True)
+            return
+        await state.clear()
+        await state.set_state(AddProduct.title)
+        await cq.answer()
+        await cq.message.answer("Название товара?")
+
     @r.message(AddProduct.title, F.text)
     async def add_product_title(m: Message, state: FSMContext):
         title = m.text.strip()
@@ -276,6 +286,11 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
             lines.append(f"#{row['id']} | {row['title']} | {username} | {row['created_at']}")
         await m.answer("\n".join(lines))
 
+    async def _start_edit_flow(state: FSMContext, pid: int):
+        await state.clear()
+        await state.update_data(edit_product_id=pid)
+        await state.set_state(EditProduct.choose_field)
+
     @r.message(Command("edit_product"))
     async def edit_product_cmd(m: Message, state: FSMContext):
         if not is_admin(m.from_user.id):
@@ -292,11 +307,27 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
             await m.answer("Товар не найден.")
             return
 
-        await state.clear()
-        await state.update_data(edit_product_id=pid)
-        await state.set_state(EditProduct.choose_field)
-
+        await _start_edit_flow(state, pid)
         await m.answer(
+            f"Редактируем товар #{pid}: {p.title}\nВыбери поле:",
+            reply_markup=kb_edit_fields(pid)
+        )
+
+    @r.callback_query(F.data.startswith("admin_edit_start:"))
+    async def edit_product_from_card(cq: CallbackQuery, state: FSMContext):
+        if not is_admin(cq.from_user.id):
+            await cq.answer("Нет доступа", show_alert=True)
+            return
+
+        pid = int(cq.data.split(":")[1])
+        p = await repo.get_product(pid)
+        if not p:
+            await cq.answer("Товар не найден", show_alert=True)
+            return
+
+        await _start_edit_flow(state, pid)
+        await cq.answer()
+        await cq.message.answer(
             f"Редактируем товар #{pid}: {p.title}\nВыбери поле:",
             reply_markup=kb_edit_fields(pid)
         )

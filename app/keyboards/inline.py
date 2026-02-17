@@ -14,7 +14,7 @@ def kb_admin_panel() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="📦 Товары", callback_data="admin:products")],
             [InlineKeyboardButton(text="📨 Заявки", callback_data="menu:orders")],
-            [InlineKeyboardButton(text="➕ Добавить товар", callback_data="admin:add_help")],
+            [InlineKeyboardButton(text="➕ Добавить товар", callback_data="admin:add")],
             [InlineKeyboardButton(text="← В меню", callback_data="menu:home")],
         ]
     )
@@ -55,7 +55,7 @@ def kb_product_details(
     if not is_admin:
         rows.append([InlineKeyboardButton(text="✅ Заказать", callback_data=f"order:{product_id}")])
     else:
-        rows.append([InlineKeyboardButton(text="✏️ Изменить", callback_data=f"admin_edit_hint:{product_id}")])
+        rows.append([InlineKeyboardButton(text="✏️ Изменить", callback_data=f"admin_edit_start:{product_id}")])
         if status == "sold":
             rows.append([InlineKeyboardButton(text="🟢 В наличии", callback_data=f"admin_status:{product_id}:available:{page}")])
         else:
