@@ -12,10 +12,10 @@ class CatalogService:
         self._repo = repo
 
     async def send_catalog_page(self, bot: Bot, chat_id: int, page: int, edit_from: Optional[CallbackQuery] = None):
-        total = await self._repo.count_products()
+        total = await self._repo.count_products(include_hidden=False)
         max_page = max(0, (total - 1) // self._repo._page_size)  # ок для простоты; хочешь — сделаем красиво
 
-        products = await self._repo.get_products_page(page)
+        products = await self._repo.get_products_page(page, include_hidden=False)
         if not products:
             text = "Каталог пуст."
             if edit_from:
@@ -35,12 +35,12 @@ class CatalogService:
             preview_id = await self._repo.get_preview_photo_id(p.id)
             caption = render_card_caption(p)
             if preview_id:
-                await bot.send_photo(chat_id, photo=preview_id, caption=caption, reply_markup=kb_product(p.id))
+                await bot.send_photo(chat_id, photo=preview_id, caption=caption, reply_markup=kb_product(p.id, is_admin=False))
             else:
-                await bot.send_message(chat_id, caption, reply_markup=kb_product(p.id))
+                await bot.send_message(chat_id, caption, reply_markup=kb_product(p.id, is_admin=False))
 
     async def send_product_details(self, cq: CallbackQuery, product_id: int, back_page: int = 0):
-        p = await self._repo.get_product(product_id)
+        p = await self._repo.get_product(product_id, include_hidden=False)
         if not p:
             await cq.message.answer("Товар не найден.")
             return

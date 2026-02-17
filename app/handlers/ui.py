@@ -1,5 +1,6 @@
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.types import CallbackQuery
+
 from app.keyboards.inline import kb_product
 
 
@@ -9,7 +10,6 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
     def is_admin(uid: int):
         return uid in admin_ids
 
-    # Переключение статуса
     @r.callback_query(F.data.startswith("admin_status:"))
     async def change_status(cq: CallbackQuery):
         if not is_admin(cq.from_user.id):
@@ -21,20 +21,14 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
 
         label = "В НАЛИЧИИ" if new_status == "available" else "РАСПРОДАНО"
         await repo.set_status(pid, new_status, label)
-
         p = await repo.get_product(pid)
 
-        await cq.answer("Статус обновлён")
-        await cq.message.edit_reply_markup(
-            reply_markup=kb_product(
-                p.id,
-                True,
-                p.status,
-                p.is_hidden
+        if p:
+            await cq.message.edit_reply_markup(
+                reply_markup=kb_product(p.id, True, p.status, p.is_hidden)
             )
-        )
+        await cq.answer("Статус обновлён")
 
-    # Скрыть / Показать
     @r.callback_query(F.data.startswith("admin_hide:"))
     async def hide_product(cq: CallbackQuery):
         if not is_admin(cq.from_user.id):
@@ -48,27 +42,26 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
         await repo.set_hidden(pid, hidden)
         p = await repo.get_product(pid)
 
-        await cq.answer("Обновлено")
-        await cq.message.edit_reply_markup(
-            reply_markup=kb_product(
-                p.id,
-                True,
-                p.status,
-                p.is_hidden
+        if p:
+            await cq.message.edit_reply_markup(
+                reply_markup=kb_product(p.id, True, p.status, p.is_hidden)
             )
-        )
+        await cq.answer("Обновлено")
 
-    # Заказ
     @r.callback_query(F.data.startswith("order:"))
     async def order_product(cq: CallbackQuery):
         pid = int(cq.data.split(":")[1])
+        product = await repo.get_product(pid, include_hidden=False)
+        if not product:
+            await cq.answer("Товар недоступен", show_alert=True)
+            return
 
-        await repo._conn.execute(
-            "INSERT INTO orders_requests (product_id, user_id, username) VALUES (?, ?, ?)",
-            (pid, cq.from_user.id, cq.from_user.username)
+        await repo.create_order_request(
+            product_id=pid,
+            user_id=cq.from_user.id,
+            username=cq.from_user.username,
+            first_name=cq.from_user.first_name,
         )
-        await repo._conn.commit()
-
         await cq.answer("Заявка отправлена ✅", show_alert=True)
 
     return r
