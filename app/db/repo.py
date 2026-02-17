@@ -256,6 +256,15 @@ class ProductRepo:
         )
         await self._conn.commit()
 
+
+    async def set_order_status(self, order_id: int, status: str) -> bool:
+        cur = await self._conn.execute(
+            "UPDATE orders_requests SET status = ? WHERE id = ?",
+            (status, order_id),
+        )
+        await self._conn.commit()
+        return cur.rowcount > 0
+
     async def list_order_requests(self, limit: int = 30) -> list[aiosqlite.Row]:
         rows = await (await self._conn.execute(
             """

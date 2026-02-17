@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQu
 
 
 from app.db.repo import ProductRepo
+from app.keyboards.inline import kb_admin_panel
 
 
 def _slugify(text: str) -> str:
@@ -95,7 +96,7 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
         if not is_admin(m.from_user.id):
             return
         await state.clear()
-        await m.answer("Ок, отменил текущий ввод.")
+        await m.answer("Ок, отменил текущий ввод.", reply_markup=kb_admin_panel())
 
     # -------------------------
     # ADD PRODUCT WIZARD
@@ -225,7 +226,7 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
         data = await state.get_data()
         pid = data["product_id"]
         await state.clear()
-        await m.answer(f"Готово! Товар добавлен. product_id={pid}\nПроверяй /catalog")
+        await m.answer(f"Готово! Товар добавлен. product_id={pid}\nПроверяй /catalog", reply_markup=kb_admin_panel())
 
     @r.message(AddProduct.extra_photos, F.photo)
     async def add_product_extra_photo(m: Message, state: FSMContext):
@@ -361,7 +362,7 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
             return
         await state.clear()
         await cq.answer()
-        await cq.message.answer("Ок, отменил редактирование.")
+        await cq.message.answer("Ок, отменил редактирование.", reply_markup=kb_admin_panel())
 
     @r.message(EditProduct.enter_value, F.text)
     async def edit_enter_value(m: Message, state: FSMContext):
@@ -401,7 +402,8 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
         p = await repo.get_product(pid)
         await m.answer(
             f"Готово. Обновлено поле {field} у товара #{pid}.\n"
-            f"{p.title} | {p.status} | {p.price}{p.currency}"
+            f"{p.title} | {p.status} | {p.price}{p.currency}",
+            reply_markup=kb_admin_panel()
         )
 
     return r

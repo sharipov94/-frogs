@@ -20,6 +20,20 @@ def kb_admin_panel() -> InlineKeyboardMarkup:
     )
 
 
+def kb_orders_list(rows: list[dict]) -> InlineKeyboardMarkup:
+    buttons: list[list[InlineKeyboardButton]] = []
+    for row in rows:
+        current = row["status"]
+        nxt = "in_progress" if current == "new" else "done" if current == "in_progress" else "new"
+        title = "Новая" if current == "new" else "В работе" if current == "in_progress" else "Завершена"
+        buttons.append([
+            InlineKeyboardButton(text=f"#{row['id']} • {title}", callback_data=f"orderstatus:{row['id']}:{nxt}")
+        ])
+
+    buttons.append([InlineKeyboardButton(text="← В админ-панель", callback_data="menu:admin")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 def kb_catalog_card(product_id: int, page: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="Подробнее", callback_data=f"product:{product_id}:{page}")]]

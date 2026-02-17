@@ -1,7 +1,9 @@
+from html import escape
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.keyboards.inline import kb_admin_panel, kb_product_details
+from app.keyboards.inline import kb_admin_panel, kb_orders_list, kb_product_details
 
 
 def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
@@ -10,15 +12,15 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
     def is_admin(uid: int):
         return uid in admin_ids
 
-    async def replace_with_text(cq: CallbackQuery, text: str, markup: InlineKeyboardMarkup):
+    async def replace_with_text(cq: CallbackQuery, text: str, markup: InlineKeyboardMarkup, parse_mode: str | None = None):
         try:
-            await cq.message.edit_text(text, reply_markup=markup)
+            await cq.message.edit_text(text, reply_markup=markup, parse_mode=parse_mode)
         except Exception:
             try:
                 await cq.message.delete()
             except Exception:
                 pass
-            await cq.message.answer(text, reply_markup=markup)
+            await cq.message.answer(text, reply_markup=markup, parse_mode=parse_mode)
 
     @r.callback_query(F.data == "admin:products")
     async def admin_products(cq: CallbackQuery):
@@ -97,11 +99,36 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
             return
 
         lines = ["Последние заявки:"]
+        row_dicts: list[dict] = []
         for row in rows:
-            username = f"@{row['username']}" if row["username"] else row["first_name"] or "без имени"
-            lines.append(f"#{row['id']} | {row['title']} | {username} | {row['created_at']}")
+            status_label = "new" if row["status"] == "new" else "in_progress" if row["status"] == "in_progress" else "done"
+            if row["username"]:
+                uname = escape(row["username"])
+                contact = f"<a href='https://t.me/{uname}'>@{uname}</a>"
+            else:
+                contact_name = escape(row["first_name"] or "пользователь")
+                contact = f"<a href='tg://user?id={row['user_id']}'>{contact_name}</a>"
+
+            lines.append(f"#{row['id']} [{status_label}] | {escape(row['title'])} | {contact} | {row['created_at']}")
+            row_dicts.append(dict(row))
+
         await cq.answer()
-        await replace_with_text(cq, "\n".join(lines), kb_admin_panel())
+        await replace_with_text(cq, "\n".join(lines), kb_orders_list(row_dicts), parse_mode="HTML")
+
+    @r.callback_query(F.data.startswith("orderstatus:"))
+    async def update_order_status(cq: CallbackQuery):
+        if not is_admin(cq.from_user.id):
+            await cq.answer("Нет доступа", show_alert=True)
+            return
+
+        _, order_id, new_status = cq.data.split(":")
+        ok = await repo.set_order_status(int(order_id), new_status)
+        if not ok:
+            await cq.answer("Заявка не найдена", show_alert=True)
+            return
+
+        await cq.answer("Статус заявки обновлён")
+        await menu_orders(cq)
 
     @r.callback_query(F.data.startswith("order:"))
     async def order_product(cq: CallbackQuery):
