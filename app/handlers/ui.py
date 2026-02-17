@@ -1,7 +1,7 @@
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.keyboards.inline import kb_product
+from app.keyboards.inline import kb_admin_panel, kb_product_details
 
 
 def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
@@ -10,14 +10,56 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
     def is_admin(uid: int):
         return uid in admin_ids
 
+    @r.callback_query(F.data == "admin:add_help")
+    async def admin_add_help(cq: CallbackQuery):
+        if not is_admin(cq.from_user.id):
+            await cq.answer("Нет доступа", show_alert=True)
+            return
+        await cq.message.edit_text("Добавление товара: используй команду /add_product", reply_markup=kb_admin_panel())
+        await cq.answer()
+
+    @r.callback_query(F.data == "admin:products")
+    async def admin_products(cq: CallbackQuery):
+        if not is_admin(cq.from_user.id):
+            await cq.answer("Нет доступа", show_alert=True)
+            return
+
+        items = await repo.list_products(limit=20, include_hidden=True)
+        if not items:
+            await cq.message.edit_text("Товаров пока нет.", reply_markup=kb_admin_panel())
+            await cq.answer()
+            return
+
+        lines = ["Товары (20):"]
+        buttons: list[list[InlineKeyboardButton]] = []
+        for p in items:
+            hidden = "скрыт" if p.is_hidden else "виден"
+            lines.append(f"{p.id}: {p.title} | {p.status} | {hidden}")
+            buttons.append([InlineKeyboardButton(text=f"Открыть #{p.id}", callback_data=f"product:{p.id}:0")])
+
+        buttons.append([InlineKeyboardButton(text="← Назад", callback_data="menu:admin")])
+        await cq.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        await cq.answer()
+
+    @r.callback_query(F.data.startswith("admin_edit_hint:"))
+    async def admin_edit_hint(cq: CallbackQuery):
+        if not is_admin(cq.from_user.id):
+            await cq.answer("Нет доступа", show_alert=True)
+            return
+        pid = int(cq.data.split(":")[1])
+        await cq.answer()
+        await cq.message.answer(f"Редактирование товара: /edit_product {pid}")
+
     @r.callback_query(F.data.startswith("admin_status:"))
     async def change_status(cq: CallbackQuery):
         if not is_admin(cq.from_user.id):
             await cq.answer("Нет доступа", show_alert=True)
             return
 
-        _, pid, new_status = cq.data.split(":")
-        pid = int(pid)
+        parts = cq.data.split(":")
+        pid = int(parts[1])
+        new_status = parts[2]
+        page = int(parts[3]) if len(parts) > 3 else 0
 
         label = "В НАЛИЧИИ" if new_status == "available" else "РАСПРОДАНО"
         await repo.set_status(pid, new_status, label)
@@ -25,7 +67,7 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
 
         if p:
             await cq.message.edit_reply_markup(
-                reply_markup=kb_product(p.id, True, p.status, p.is_hidden)
+                reply_markup=kb_product_details(p.id, page, True, p.status, p.is_hidden)
             )
         await cq.answer("Статус обновлён")
 
@@ -35,19 +77,19 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
             await cq.answer("Нет доступа", show_alert=True)
             return
 
-        _, pid, hidden = cq.data.split(":")
-        pid = int(pid)
-        hidden = bool(int(hidden))
+        parts = cq.data.split(":")
+        pid = int(parts[1])
+        hidden = bool(int(parts[2]))
+        page = int(parts[3]) if len(parts) > 3 else 0
 
         await repo.set_hidden(pid, hidden)
         p = await repo.get_product(pid)
 
         if p:
             await cq.message.edit_reply_markup(
-                reply_markup=kb_product(p.id, True, p.status, p.is_hidden)
+                reply_markup=kb_product_details(p.id, page, True, p.status, p.is_hidden)
             )
         await cq.answer("Обновлено")
-
 
     @r.callback_query(F.data == "menu:orders")
     async def menu_orders(cq: CallbackQuery):
@@ -58,7 +100,7 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
         rows = await repo.list_order_requests(limit=20)
         if not rows:
             await cq.answer()
-            await cq.message.edit_text("Заявок пока нет.")
+            await cq.message.edit_text("Заявок пока нет.", reply_markup=kb_admin_panel())
             return
 
         lines = ["Последние заявки:"]
@@ -66,7 +108,7 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
             username = f"@{row['username']}" if row["username"] else row["first_name"] or "без имени"
             lines.append(f"#{row['id']} | {row['title']} | {username} | {row['created_at']}")
         await cq.answer()
-        await cq.message.edit_text("\n".join(lines))
+        await cq.message.edit_text("\n".join(lines), reply_markup=kb_admin_panel())
 
     @r.callback_query(F.data.startswith("order:"))
     async def order_product(cq: CallbackQuery):

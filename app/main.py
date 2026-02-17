@@ -25,7 +25,7 @@ async def main():
     service = CatalogService(repo)
 
     dp.include_router(start.router)
-    dp.include_router(bind_catalog(service))
+    dp.include_router(bind_catalog(service, settings.admin_ids))
     dp.include_router(bind_admin(repo, settings.admin_ids))
     dp.include_router(bind_ui(repo, settings.admin_ids))
 
