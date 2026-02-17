@@ -70,6 +70,8 @@ def kb_product_details(
         rows.append([InlineKeyboardButton(text="✅ Заказать", callback_data=f"order:{product_id}")])
     else:
         rows.append([InlineKeyboardButton(text="✏️ Изменить", callback_data=f"admin_edit_start:{product_id}")])
+        rows.append([InlineKeyboardButton(text="🗑 Удалить", callback_data=f"admin_delete:{product_id}")])
+
         if status == "sold":
             rows.append([InlineKeyboardButton(text="🟢 В наличии", callback_data=f"admin_status:{product_id}:available:{page}")])
         else:

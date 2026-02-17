@@ -77,7 +77,7 @@ class CatalogService:
             await bot.send_message(chat_id, caption, reply_markup=reply_markup)
 
     async def send_product_details(self, cq: CallbackQuery, product_id: int, back_page: int, is_admin: bool):
-        p = await self._repo.get_product(product_id, include_hidden=False)
+        p = await self._repo.get_product(product_id, include_hidden=bool(is_admin))
         if not p:
             await cq.answer("Товар не найден", show_alert=True)
             return

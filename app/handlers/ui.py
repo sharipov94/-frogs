@@ -45,6 +45,22 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
         await replace_with_text(cq, "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=buttons))
         await cq.answer()
 
+
+    @r.callback_query(F.data.startswith("admin_delete:"))
+    async def delete_product_from_card(cq: CallbackQuery):
+        if not is_admin(cq.from_user.id):
+            await cq.answer("Нет доступа", show_alert=True)
+            return
+
+        pid = int(cq.data.split(":")[1])
+        ok = await repo.delete_product(pid)
+        if not ok:
+            await cq.answer("Товар не найден", show_alert=True)
+            return
+
+        await cq.answer("Товар удалён")
+        await replace_with_text(cq, "Товар удалён окончательно.", kb_admin_panel())
+
     @r.callback_query(F.data.startswith("admin_status:"))
     async def change_status(cq: CallbackQuery):
         if not is_admin(cq.from_user.id):
