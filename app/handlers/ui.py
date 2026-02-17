@@ -10,6 +10,16 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
     def is_admin(uid: int):
         return uid in admin_ids
 
+    async def replace_with_text(cq: CallbackQuery, text: str, markup: InlineKeyboardMarkup):
+        try:
+            await cq.message.edit_text(text, reply_markup=markup)
+        except Exception:
+            try:
+                await cq.message.delete()
+            except Exception:
+                pass
+            await cq.message.answer(text, reply_markup=markup)
+
     @r.callback_query(F.data == "admin:products")
     async def admin_products(cq: CallbackQuery):
         if not is_admin(cq.from_user.id):
@@ -18,7 +28,7 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
 
         items = await repo.list_products(limit=20, include_hidden=True)
         if not items:
-            await cq.message.edit_text("Товаров пока нет.", reply_markup=kb_admin_panel())
+            await replace_with_text(cq, "Товаров пока нет.", kb_admin_panel())
             await cq.answer()
             return
 
@@ -30,7 +40,7 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
             buttons.append([InlineKeyboardButton(text=f"Открыть #{p.id}", callback_data=f"product:{p.id}:0")])
 
         buttons.append([InlineKeyboardButton(text="← Назад", callback_data="menu:admin")])
-        await cq.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        await replace_with_text(cq, "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=buttons))
         await cq.answer()
 
     @r.callback_query(F.data.startswith("admin_status:"))
@@ -83,7 +93,7 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
         rows = await repo.list_order_requests(limit=20)
         if not rows:
             await cq.answer()
-            await cq.message.edit_text("Заявок пока нет.", reply_markup=kb_admin_panel())
+            await replace_with_text(cq, "Заявок пока нет.", kb_admin_panel())
             return
 
         lines = ["Последние заявки:"]
@@ -91,7 +101,7 @@ def bind_ui(repo, admin_ids: tuple[int, ...]) -> Router:
             username = f"@{row['username']}" if row["username"] else row["first_name"] or "без имени"
             lines.append(f"#{row['id']} | {row['title']} | {username} | {row['created_at']}")
         await cq.answer()
-        await cq.message.edit_text("\n".join(lines), reply_markup=kb_admin_panel())
+        await replace_with_text(cq, "\n".join(lines), kb_admin_panel())
 
     @r.callback_query(F.data.startswith("order:"))
     async def order_product(cq: CallbackQuery):
