@@ -240,7 +240,8 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
 
         lines = ["Товары (последние 50):"]
         for p in items:
-            lines.append(f"{p.id}: {p.title} | {p.status} | {p.price}{p.currency}")
+            hidden = "скрыт" if p.is_hidden else "виден"
+            lines.append(f"{p.id}: {p.title} | {p.status} | {p.price}{p.currency} | {hidden}")
         lines.append("Команды: /edit_product <id> , /delete_product <id>")
         await m.answer("\n".join(lines))
 
@@ -257,6 +258,23 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
         pid = int(parts[1])
         ok = await repo.delete_product(pid)
         await m.answer("Удалено." if ok else "Не найдено.")
+
+
+    @r.message(Command("orders"))
+    async def orders_list(m: Message):
+        if not is_admin(m.from_user.id):
+            return
+
+        rows = await repo.list_order_requests(limit=30)
+        if not rows:
+            await m.answer("Заявок пока нет.")
+            return
+
+        lines = ["Последние заявки:"]
+        for row in rows:
+            username = f"@{row['username']}" if row["username"] else row["first_name"] or "без имени"
+            lines.append(f"#{row['id']} | {row['title']} | {username} | {row['created_at']}")
+        await m.answer("\n".join(lines))
 
     @r.message(Command("edit_product"))
     async def edit_product_cmd(m: Message, state: FSMContext):
@@ -356,35 +374,3 @@ def bind_admin(repo: ProductRepo, admin_ids: tuple[int, ...]) -> Router:
         )
 
     return r
-
-    @r.message(F.text == "🛠 Админ-панель")
-    async def admin_panel_btn(m: Message):
-        if not is_admin(m.from_user.id):
-            return
-        await m.answer(
-            "Админ-панель:\n"
-            "➕ Добавить товар\n"
-            "📋 Товары\n"
-            "✏️ Редактировать товар\n"
-            "🗑 Удалить товар\n"
-            "❌ Отмена"
-    )
-
-    @r.message(F.text == "➕ Добавить товар")
-    async def add_product_btn(m: Message, state: FSMContext):
-        if not is_admin(m.from_user.id):
-            return
-        await add_product_start(m, state)  # переиспользуем твою функцию
-
-    @r.message(F.text == "📋 Товары")
-    async def products_btn(m: Message):
-        if not is_admin(m.from_user.id):
-            return
-        await products_list(m)
-
-    @r.message(F.text == "❌ Отмена")
-    async def cancel_btn(m: Message, state: FSMContext):
-        if not is_admin(m.from_user.id):
-            return
-        await cancel(m, state)
-

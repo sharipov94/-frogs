@@ -8,7 +8,6 @@ from app.services.catalog_service import CatalogService
 from app.handlers import start
 from app.handlers.catalog import bind as bind_catalog
 from app.handlers.admin import bind_admin
-from app.handlers.menu import bind_menu
 from app.handlers.ui import bind_ui
 
 
@@ -25,7 +24,6 @@ async def main():
     repo = ProductRepo(db.conn, page_size=settings.page_size)
     service = CatalogService(repo)
 
-    dp.include_router(bind_menu(service, repo, settings.admin_ids))
     dp.include_router(start.router)
     dp.include_router(bind_catalog(service))
     dp.include_router(bind_admin(repo, settings.admin_ids))

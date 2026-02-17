@@ -1,6 +1,6 @@
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import CallbackQuery
 
 from app.services.catalog_service import CatalogService
 
@@ -8,28 +8,29 @@ router = Router()
 
 
 def bind(service: CatalogService) -> Router:
-    # создаём роутер с замыканием на service (просто и чисто)
     r = Router()
 
-    @r.message(F.text == "📦 Каталог")
-    async def catalog_btn(m: Message):
+    @r.message(Command("catalog"))
+    async def catalog(m):
         await service.send_catalog_page(m.bot, m.chat.id, page=0)
 
-    @r.message(Command("catalog"))
-    async def catalog(m: Message):
-        await service.send_catalog_page(m.bot, m.chat.id, page=0)
+    @r.callback_query(F.data.startswith("menu:catalog:"))
+    async def catalog_from_menu(cq: CallbackQuery):
+        page = int(cq.data.split(":")[-1])
+        await service.send_catalog_page(cq.bot, cq.message.chat.id, page=page, edit_from=cq)
+        await cq.answer()
 
     @r.callback_query(F.data.startswith("catalog:"))
     async def catalog_cb(cq: CallbackQuery):
         page = int(cq.data.split(":")[1])
-        await cq.answer()
         await service.send_catalog_page(cq.bot, cq.message.chat.id, page=page, edit_from=cq)
+        await cq.answer()
 
     @r.callback_query(F.data.startswith("product:"))
     async def product_cb(cq: CallbackQuery):
-        product_id = int(cq.data.split(":")[1])
+        _, pid, page = cq.data.split(":")
+        await service.send_product_details(cq, product_id=int(pid), back_page=int(page))
         await cq.answer()
-        await service.send_product_details(cq, product_id=product_id, back_page=0)
 
     @r.callback_query(F.data == "noop")
     async def noop(cq: CallbackQuery):
